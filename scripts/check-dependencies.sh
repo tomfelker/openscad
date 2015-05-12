@@ -50,7 +50,7 @@ opencsg_sysver()
 {
   debug opencsg_sysver
   if [ ! -e $1/include/opencsg.h ]; then return; fi
-  ocsgver=`grep "define  *OPENCSG_VERSION_STRING *[0-9x]*" $1/include/opencsg.h`
+  ocsgver=`grep -a "define  *OPENCSG_VERSION_STRING *[0-9x]*" $1/include/opencsg.h`
   ocsgver=`echo $ocsgver | awk '{print $4}' | sed s/'"'//g | sed s/[^1-9.]//g`
   opencsg_sysver_result=$ocsgver
 }
@@ -145,7 +145,7 @@ mpfr_sysver()
 
 gmp_sysver()
 {
-  gmppaths="`find $1 -name 'gmp.h' -o -name 'gmp-*.h' 2>/dev/null`"
+  gmppaths="`find $1/include -name 'gmp.h' -o -name 'gmp-*.h' 2>/dev/null`"
   if [ ! "$gmppaths" ]; then
     debug "gmp_sysver no gmp.h beneath $1"
     return
@@ -160,32 +160,65 @@ gmp_sysver()
   gmp_sysver_result="$gmpmaj.$gmpmin.$gmppat"
 }
 
-qt4_sysver()
+qt_sysver()
 {
-  qt4path=$1/include/qt4/QtCore/qglobal.h
-  if [ ! -e $qt4path ]; then
-    qt4path=$1/include/QtCore/qglobal.h
+  if [ "`command -v qtchooser`" ]; then
+    if qtchooser -run-tool=qmake -qt=5 -v >/dev/null 2>&1 ; then
+      export QT_SELECT=5
+      qtpath="`qtchooser -run-tool=qmake -qt=5 -query QT_INSTALL_HEADERS`"/QtCore/qglobal.h 
+    fi
+    if [ ! -e "$qtpath" ]; then
+      if qtchooser -run-tool=qmake -qt=4 -v >/dev/null 2>&1 ; then
+        export QT_SELECT=4
+        qtpath="`qtchooser -run-tool=qmake -qt=4 -query QT_INSTALL_HEADERS`"/QtCore/qglobal.h 
+      fi
+    fi
+  else
+    export QT_SELECT=5
+    qtpath=$1/include/qt5/QtCore/qglobal.h
+    if [ ! -e $qtpath ]; then
+      qtpath=$1/include/i686-linux-gnu/qt5/QtCore/qglobal.h
+    fi
+    if [ ! -e $qtpath ]; then
+      qtpath=$1/include/x86_64-linux-gnu/qt5/QtCore/qglobal.h
+    fi
+    if [ ! -e $qtpath ]; then
+      export QT_SELECT=4
+      qtpath=$1/include/qt4/QtCore/qglobal.h
+    fi
+    if [ ! -e $qtpath ]; then
+      qtpath=$1/include/QtCore/qglobal.h
+    fi
+    if [ ! -e $qtpath ]; then
+      # netbsd
+      qtpath=$1/qt4/include/QtCore/qglobal.h 
+    fi
   fi
-  if [ ! -e $qt4path ]; then
-    # netbsd
-    qt4path=$1/qt4/include/QtCore/qglobal.h 
+  if [ ! -e "$qtpath" ]; then
+    unset QT_SELECT
+    return
   fi
-  if [ ! -e $qt4path ]; then return; fi
-  qt4ver=`grep 'define  *QT_VERSION_STR  *' $qt4path | awk '{print $3}'`
-  qt4ver=`echo $qt4ver | sed s/'"'//g`
-  qt4_sysver_result=$qt4ver
+  qtver=`grep 'define  *QT_VERSION_STR  *' $qtpath | awk '{print $3}'`
+  qtver=`echo $qtver | sed s/'"'//g`
+  qt_sysver_result=$qtver
 }
 
 qscintilla2_sysver()
 {
-  QMAKE=qmake
-  if [ "`command -v qmake-qt4`" ]; then
+  # expecting the QT_SELECT already set in case we found qtchooser
+  if qmake -v >/dev/null 2>&1 ; then
+    QMAKE=qmake
+  elif [ "`command -v qmake-qt4`" ]; then
     QMAKE=qmake-qt4
   fi
-  
-  qt4incdir="`$QMAKE -query QT_INSTALL_HEADERS`"
-  qscipath="$qt4incdir/Qsci/qsciglobal.h"
+  debug using qmake: $QMAKE
+
+  qtincdir="`$QMAKE -query QT_INSTALL_HEADERS`"
+  qscipath="$qtincdir/Qsci/qsciglobal.h"
+  debug using qtincdir: $qtincdir
+  debug using qscipath: $qscipath
   if [ ! -e $qscipath ]; then
+    debug qscipath doesnt exist. giving up on version.
     return
   fi
 
@@ -607,7 +640,7 @@ checkargs()
 
 main()
 {
-  deps="qt4 qscintilla2 cgal gmp mpfr boost opencsg glew eigen glib2 fontconfig freetype2 harfbuzz gcc bison flex make"
+  deps="qt qscintilla2 cgal gmp mpfr boost opencsg glew eigen glib2 fontconfig freetype2 harfbuzz bison flex make"
   #deps="$deps curl git" # not technically necessary for build
   #deps="$deps python cmake imagemagick" # only needed for tests
   #deps="cgal"

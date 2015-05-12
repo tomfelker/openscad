@@ -41,6 +41,9 @@
 
 #include <boost/math/special_functions/fpclassify.hpp>
 
+Value Value::undefined;
+ValuePtr ValuePtr::undefined;
+
 std::ostream &operator<<(std::ostream &stream, const Filename &filename)
 {
   fs::path fnpath = fs::path( (std::string)filename );
@@ -76,8 +79,6 @@ std::ostream &operator<<(std::ostream &stream, const QuotedString &s)
   stream << '"';
   return stream;
 }
-
-Value Value::undefined;
 
 Value::Value() : value(boost::blank())
 {
@@ -129,9 +130,19 @@ Value::ValueType Value::type() const
   return static_cast<ValueType>(this->value.which());
 }
 
+bool Value::isDefined() const
+{
+  return this->type() != UNDEFINED;
+}
+
+bool Value::isDefinedAs(const ValueType type) const
+{
+  return this->type() == type;
+}
+
 bool Value::isUndefined() const
 {
-  return this->type() == UNDEFINED;
+  return !isDefined();
 }
 
 bool Value::toBool() const
@@ -199,15 +210,15 @@ public:
     tmp << op1;
     std::string tmpstr = tmp.str();
     size_t endpos = tmpstr.find_last_not_of('0');
-    if (endpos >= 0 && tmpstr[endpos] == '.') endpos--;
+    if (tmpstr[endpos] == '.') endpos--;
     tmpstr = tmpstr.substr(0, endpos+1);
     size_t dotpos = tmpstr.find('.');
     if (dotpos != std::string::npos) {
       if (tmpstr.size() - dotpos > 12) tmpstr.erase(dotpos + 12);
       while (tmpstr[tmpstr.size()-1] == '0') tmpstr.erase(tmpstr.size()-1);
     }
-    if ( tmpstr.compare("-0") == 0 ) tmpstr = "0";
-    tmpstr = two_digit_exp_format( tmpstr );
+    if (tmpstr.compare("-0") == 0) tmpstr = "0";
+    tmpstr = two_digit_exp_format(tmpstr);
     return tmpstr;
 #else
     // attempt to emulate Qt's QString.sprintf("%g"); from old OpenSCAD.
@@ -688,7 +699,7 @@ public:
   }
 };
 
-Value Value::operator[](const Value &v)
+Value Value::operator[](const Value &v) const
 {
   return boost::apply_visitor(bracket_visitor(), this->value, v.value);
 }
@@ -696,7 +707,7 @@ Value Value::operator[](const Value &v)
 void Value::RangeType::normalize() {
   if ((step_val>0) && (end_val < begin_val)) {
     std::swap(begin_val,end_val);
-    printDeprecation("DEPRECATED: Using ranges of the form [begin:end] with begin value greater than the end value is deprecated.");
+    printDeprecation("Using ranges of the form [begin:end] with begin value greater than the end value is deprecated.");
   }
 }
 
@@ -790,3 +801,124 @@ bool Value::RangeType::iterator::operator!=(const self_type &other) const
 {
     return !(*this == other);
 }
+
+ValuePtr::ValuePtr()
+{
+	this->reset(new Value());
+}
+
+ValuePtr::ValuePtr(const Value &v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(bool v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(int v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(double v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(const std::string &v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(const char *v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(const char v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(const Value::VectorType &v)
+{
+	this->reset(new Value(v));
+}
+
+ValuePtr::ValuePtr(const Value::RangeType &v)
+{
+	this->reset(new Value(v));
+}
+
+bool ValuePtr::operator==(const ValuePtr &v) const
+{
+	return ValuePtr(**this == *v);
+}
+
+bool ValuePtr::operator!=(const ValuePtr &v) const
+{
+	return ValuePtr(**this != *v);
+}
+
+bool ValuePtr::operator<(const ValuePtr &v) const
+{
+	return ValuePtr(**this < *v);
+}
+
+bool ValuePtr::operator<=(const ValuePtr &v) const
+{
+	return ValuePtr(**this <= *v);
+}
+
+bool ValuePtr::operator>=(const ValuePtr &v) const
+{
+	return ValuePtr(**this >= *v);
+}
+
+bool ValuePtr::operator>(const ValuePtr &v) const
+{
+	return ValuePtr(**this > *v);
+}
+
+ValuePtr ValuePtr::operator-() const
+{
+	return ValuePtr(-**this);
+}
+
+ValuePtr ValuePtr::operator!() const
+{
+	return ValuePtr(!**this);
+}
+
+ValuePtr ValuePtr::operator[](const ValuePtr &v) const
+{
+	return ValuePtr((**this)[*v]);
+}
+
+ValuePtr ValuePtr::operator+(const ValuePtr &v) const
+{
+	return ValuePtr(**this + *v);
+}
+
+ValuePtr ValuePtr::operator-(const ValuePtr &v) const
+{
+	return ValuePtr(**this - *v);
+}
+
+ValuePtr ValuePtr::operator*(const ValuePtr &v) const
+{
+	return ValuePtr(**this * *v);
+}
+
+ValuePtr ValuePtr::operator/(const ValuePtr &v) const
+{
+	return ValuePtr(**this / *v);
+}
+
+ValuePtr ValuePtr::operator%(const ValuePtr &v) const
+{
+	return ValuePtr(**this % *v);
+}
+

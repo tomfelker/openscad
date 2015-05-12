@@ -1,6 +1,8 @@
 #!/bin/sh
-# NB! To build a release build, the VERSION and VERSIONDATE environment variables needs to be set.
-# See doc/release-checklist.txt
+#
+# Usage:
+#   ./scripts/publish-macosx.sh [buildonly]
+#
 
 export NUMCPU=$(sysctl -n hw.ncpu)
 
@@ -40,6 +42,13 @@ update_www_download_links()
     fi
 }
 
+# Cmd-line parameters
+DOUPLOAD=1
+if [ "`echo $* | grep buildonly`" ]; then
+  echo "Build only, no upload"
+  DOUPLOAD=
+fi
+
 if test -z "$VERSIONDATE"; then
   VERSIONDATE=`date "+%Y.%m.%d"`
 fi
@@ -47,6 +56,7 @@ if test -z "$VERSION"; then
   VERSION=$VERSIONDATE
   SNAPSHOT=snapshot
 fi
+SHORTVERSION=${VERSION%%-*}
 
 # Turn off ccache, just for safety
 PATH=${PATH//\/opt\/local\/libexec\/ccache:}
@@ -85,16 +95,34 @@ else
 fi
 echo "Creating appcast $APPCASTFILE..."
 FILESIZE=$(stat -f "%z" OpenSCAD-$VERSION.dmg)
-sed -e "s,@VERSION@,$VERSION,g" -e "s,@VERSIONDATE@,$VERSIONDATE,g" -e "s,@DSASIGNATURE@,$SIGNATURE,g" -e "s,@FILESIZE@,$FILESIZE,g" $APPCASTFILE.in > $APPCASTFILE
+sed -e "s,@VERSION@,$VERSION,g" -e "s,@SHORTVERSION@,$SHORTVERSION,g" -e "s,@VERSIONDATE@,$VERSIONDATE,g" -e "s,@DSASIGNATURE@,$SIGNATURE,g" -e "s,@FILESIZE@,$FILESIZE,g" $APPCASTFILE.in > $APPCASTFILE
 cp $APPCASTFILE ../openscad.github.com
 if [[ $VERSION == $VERSIONDATE ]]; then
   cp $APPCASTFILE ../openscad.github.com/appcast-snapshots.xml
 fi
 
+if [ ! $DOUPLOAD ]; then
+  exit 0
+fi
+
 echo "Uploading..."
-scp OpenSCAD-$VERSION.dmg openscad@files.openscad.org:www/snapshots
+if [[ $VERSION == $VERSIONDATE ]]; then
+  scp OpenSCAD-$VERSION.dmg openscad@files.openscad.org:www/snapshots
+else
+  scp OpenSCAD-$VERSION.dmg openscad@files.openscad.org:www
+fi
 if [[ $? != 0 ]]; then
   exit 1
+fi
+scp $APPCASTFILE openscad@files.openscad.org:www/
+if [[ $? != 0 ]]; then
+  exit 1
+fi
+if [[ $VERSION == $VERSIONDATE ]]; then
+  scp $APPCASTFILE openscad@files.openscad.org:www/appcast-snapshots.xml
+  if [[ $? != 0 ]]; then
+    exit 1
+  fi
 fi
 
 # Update snapshot filename on web page

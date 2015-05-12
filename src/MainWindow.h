@@ -1,5 +1,6 @@
 #pragma once
 
+#include "qtgettext.h"
 #include <QMainWindow>
 #include <QIcon>
 #include "ui_MainWindow.h"
@@ -13,6 +14,7 @@
 #include <vector>
 #include <QMutex>
 #include <QSet>
+#include <QTime>
 
 enum export_type_e {
 	EXPORT_TYPE_UNKNOWN,
@@ -38,6 +40,8 @@ public:
 	QTimer *autoReloadTimer;
 	std::string autoReloadId;
 	QTimer *waitAfterReloadTimer;
+
+	QTime renderingTime;
 
 	ModuleContext top_ctx;
 	FileModule *root_module;      // Result of parsing
@@ -67,8 +71,15 @@ public:
 	QAction *actionRecentFile[UIUtils::maxRecentFiles];
         QMap<QString, QString> knownFileExtensions;
 
+        QLabel *versionLabel;
+        QWidget *editorDockTitleWidget;
+        QWidget *consoleDockTitleWidget;
+        
 	QString editortype;	
 	bool useScintilla;
+
+        int compileErrors;
+        int compileWarnings;
 
 	MainWindow(const QString &filename);
 	~MainWindow();
@@ -81,12 +92,16 @@ private slots:
 	void updateTVal();
         void updateMdiMode(bool mdi);
         void updateUndockMode(bool undockMode);
+        void updateReorderMode(bool reorderMode);
 	void setFileName(const QString &filename);
 	void setFont(const QString &family, uint size);
 	void setColorScheme(const QString &cs);
 	void showProgress();
 	void openCSGSettingsChanged();
+	void consoleOutput(const QString &msg);
+
 private:
+        void initActionIcon(QAction *action, const char *darkResource, const char *lightResource);
 	void openFile(const QString &filename);
         void handleFileDrop(const QString &filename);
 	void refreshDocument();
@@ -94,6 +109,7 @@ private:
 	void updateTemporalVariables();
 	bool fileChangedOnDisk();
 	void compileTopLevelDocument();
+        void updateCompileResult();
 	void compile(bool reload, bool forcedone = false);
 	void compileCSG(bool procevents);
 	bool maybeSave();
@@ -108,6 +124,7 @@ private:
 	void show_examples();
 	void setDockWidgetTitle(QDockWidget *dockWidget, QString prefix, bool topLevel);
         void addKeyboardShortCut(const QList<QAction *> &actions);
+        void updateStatusBar(class ProgressWidget *progressWidget);
 
 	EditorInterface *editor;
 
@@ -115,7 +132,6 @@ private:
   class FontListDialog *font_list_dialog;
 
 private slots:
-	void actionUpdateCheck();
 	void actionNew();
 	void actionOpen();
 	void actionOpenRecent();
@@ -140,6 +156,7 @@ private slots:
 	void hideToolbars();
 	void hideEditor();
 	void hideConsole();
+	void showConsole();
 
 private slots:
 	void selectFindType(int);
@@ -182,7 +199,7 @@ private slots:
 	void actionFlushCaches();
 
 public:
-	static QSet<MainWindow*> *windows;
+	static QSet<MainWindow*> *getWindows();
 	void viewModeActionsUncheck();
 	void setCurrentOutput();
 	void clearCurrentOutput();
@@ -191,6 +208,7 @@ public slots:
 	void actionReloadRenderPreview();
         void on_editorDock_visibilityChanged(bool);
         void on_consoleDock_visibilityChanged(bool);
+        void on_toolButtonCompileResultClose_clicked();
         void editorTopLevelChanged(bool);
         void consoleTopLevelChanged(bool);
 #ifdef ENABLE_OPENCSG
@@ -204,6 +222,7 @@ public slots:
 	void viewModeShowEdges();
 	void viewModeShowAxes();
 	void viewModeShowCrosshairs();
+	void viewModeShowScaleProportional();
 	void viewModeAnimate();
 	void viewAngleTop();
 	void viewAngleBottom();
@@ -224,25 +243,32 @@ public slots:
 	void helpAbout();
 	void helpHomepage();
 	void helpManual();
+	void helpCheatSheet();
 	void helpLibrary();
 	void helpFontInfo();
 	void quit();
 	void checkAutoReload();
 	void waitAfterReload();
 	void autoReloadSet(bool);
+	void setContentsChanged();
+	void showFontCacheDialog();
+	void hideFontCacheDialog();
 
 private:
 	static void report_func(const class AbstractNode*, void *vp, int mark);
-        static bool mdiMode;
-        static bool undockMode;
+	static bool mdiMode;
+	static bool undockMode;
+	static bool reorderMode;
+	static QSet<MainWindow*> *windows;
+	static class QProgressDialog *fontCacheDialog;
 
 	char const * afterCompileSlot;
 	bool procevents;
-        bool isClosing;
 	class QTemporaryFile *tempFile;
 	class ProgressWidget *progresswidget;
 	class CGALWorker *cgalworker;
 	QMutex consolemutex;
+	bool contentschanged; // Set if the source code has changes since the last render (F6)
 
 signals:
 	void highlightError(int);
