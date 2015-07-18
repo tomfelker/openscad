@@ -42,6 +42,7 @@
 #include "stackcheck.h"
 #include "CocoaUtils.h"
 #include "FontCache.h"
+#include "SixDoFDev.h"
 
 #include <string>
 #include <vector>
@@ -743,6 +744,7 @@ int gui(vector<string> &inputFiles, const fs::path &original_path, int argc, cha
 	}
 
 	app.connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
+	spacenav();
 	int rc = app.exec();
 	QSet<MainWindow*> *windows = MainWindow::getWindows();
 	foreach (MainWindow *mainw, *windows) {
