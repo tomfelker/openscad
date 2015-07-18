@@ -8,9 +8,9 @@
 #include <Eigen/Geometry>
 #include "GLView.h"
 #include "renderer.h"
-#include "SixDoFDev.h"
+#include "input/InputDriver.h"
 
-class QGLView : public QGLWidget, public GLView, public SixDoFDevEventHandler
+class QGLView : public QGLWidget, public GLView, public InputEventHandler
 {
 	Q_OBJECT
 	Q_PROPERTY(bool showFaces READ showFaces WRITE setShowFaces);
@@ -53,10 +53,6 @@ public slots:
 	void ZoomIn(void);
 	void ZoomOut(void);
 
-	void SixDoFDev_translate( SixDoFDevEventTranslate* event);
-	void SixDoFDev_rotate( SixDoFDevEventRotate* event);
-	void SixDoFDev_button( SixDoFDevEventButton* event);
-
 public:
 	QLabel *statusLabel;
 
@@ -67,18 +63,25 @@ private:
 	QPoint last_mouse;
 	QImage frame; // Used by grabFrame() and save()
 
+        void onTranslateEvent(const InputEventTranslate *event);
+        void onRotateEvent(const InputEventRotate *event);
+        void onButtonEvent(const InputEventButton *event);
+        void onZoomEvent(const InputEventZoom *event);
+
 	void wheelEvent(QWheelEvent *event);
 	void mousePressEvent(QMouseEvent *event);
 	void mouseMoveEvent(QMouseEvent *event);
 	void mouseReleaseEvent(QMouseEvent *event);
 	void mouseDoubleClickEvent(QMouseEvent *event);
-	void translate( double x, double y, double z);
-	void rotate( double x, double y, double z);
 
 	void initializeGL();
 	void resizeGL(int w, int h);
 
 	void paintGL();
+
+        void zoom(double v, bool relative);
+        void rotate(double x, double y, double z, bool relative);
+        void translate(double x, double y, double z, bool relative, bool viewPortRelative = true);
 	void normalizeAngle(GLdouble& angle);
 
 #ifdef ENABLE_OPENCSG

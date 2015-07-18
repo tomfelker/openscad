@@ -42,7 +42,6 @@
 #include "stackcheck.h"
 #include "CocoaUtils.h"
 #include "FontCache.h"
-#include "SixDoFDev.h"
 
 #include <string>
 #include <vector>
@@ -560,6 +559,8 @@ Q_IMPORT_PLUGIN(qtaccessiblewidgets)
 #include "MainWindow.h"
 #include "launchingscreen.h"
 #include "qsettings.h"
+#include "input/InputDriverManager.h"
+#include "input/SixDoFDev.h"
   #ifdef __APPLE__
   #include "EventFilter.h"
   #endif
@@ -744,7 +745,7 @@ int gui(vector<string> &inputFiles, const fs::path &original_path, int argc, cha
 	}
 
 	app.connect(&app, SIGNAL(lastWindowClosed()), &app, SLOT(quit()));
-	spacenav();
+        InputDriverManager::instance()->registerDriver(new SixDoFDev());
 	int rc = app.exec();
 	QSet<MainWindow*> *windows = MainWindow::getWindows();
 	foreach (MainWindow *mainw, *windows) {
