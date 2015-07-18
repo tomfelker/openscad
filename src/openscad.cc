@@ -563,6 +563,7 @@ Q_IMPORT_PLUGIN(qtaccessiblewidgets)
 #include "input/HidApiInputDriver.h"
 #include "input/SpaceNavInputDriver.h"
 #include "input/JoystickInputDriver.h"
+#include "input/DBusInputDriver.h"
   #ifdef __APPLE__
   #include "EventFilter.h"
   #endif
@@ -750,6 +751,7 @@ int gui(vector<string> &inputFiles, const fs::path &original_path, int argc, cha
         InputDriverManager::instance()->registerDriver(new HidApiInputDriver());
         InputDriverManager::instance()->registerDriver(new SpaceNavInputDriver());
         InputDriverManager::instance()->registerDriver(new JoystickInputDriver());
+        InputDriverManager::instance()->registerDriver(new DBusInputDriver());
         InputDriverManager::instance()->init();
 	int rc = app.exec();
 	QSet<MainWindow*> *windows = MainWindow::getWindows();
