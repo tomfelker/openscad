@@ -342,7 +342,8 @@ HEADERS += src/typedefs.h \
            src/input/InputDriver.h \
            src/input/InputDriverManager.h \
            src/input/HidApiInputDriver.h \
-           src/input/SpaceNavInputDriver.h
+           src/input/SpaceNavInputDriver.h \
+           src/input/JoystickInputDriver.h
 
 SOURCES += src/version_check.cc \
            src/ProgressWidget.cc \
@@ -444,7 +445,8 @@ SOURCES += src/version_check.cc \
            src/input/InputDriver.cc \
            src/input/InputDriverManager.cc \
            src/input/HidApiInputDriver.cc \
-           src/input/SpaceNavInputDriver.cc
+           src/input/SpaceNavInputDriver.cc \
+           src/input/JoystickInputDriver.cc
 
 # ClipperLib
 SOURCES += src/polyclipping/clipper.cpp
