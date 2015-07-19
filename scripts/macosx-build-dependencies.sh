@@ -54,6 +54,7 @@ PACKAGES=(
     "harfbuzz 0.9.40"
     "libxml2 2.9.2"
     "fontconfig 2.11.1"
+    "hidapi 0.7.0"
 )
 DEPLOY_PACKAGES=(
     "sparkle Cocoanetics:1e7dcb1a48b96d1a8c62100b5864bd50211cbae1"
@@ -822,6 +823,31 @@ build_harfbuzz()
   PKG_CONFIG_LIBDIR="$DEPLOYDIR/lib/pkgconfig" ./autogen.sh --prefix="$DEPLOYDIR" --with-freetype=yes --with-gobject=no --with-cairo=no --with-icu=no CFLAGS=-mmacosx-version-min=$MAC_OSX_VERSION_MIN CXXFLAGS="$CXXFLAGS -mmacosx-version-min=$MAC_OSX_VERSION_MIN" LDFLAGS="$CXXFLAGS -mmacosx-version-min=$MAC_OSX_VERSION_MIN" $extra_config_flags
   make -j$NUMCPU
   make install
+}
+
+check_hidapi()
+{
+    check_file lib/libhidapi.a
+}
+
+build_hidapi()
+{
+  version=$1
+  extra_config_flags=""
+
+  echo "Building hidapi $version..."
+  cd "$BASEDIR"/src
+  rm -rf "hidapi-$version"
+  if [ ! -f "hidapi-$version.zip" ]; then
+    curl --insecure -LO "http://github.com/downloads/signal11/hidapi/hidapi-${version}.zip"
+  fi
+  unzip "hidapi-$version.zip"
+  cd "hidapi-$version"
+  make -C mac -j$NUMCPU
+  mkdir -p "$DEPLOYDIR"/lib
+  libtool -static -o "$DEPLOYDIR"/lib/libhidapi.a mac/hid.o
+  mkdir -p "$DEPLOYDIR"/include/hidapi
+  cp hidapi/hidapi.h "$DEPLOYDIR"/include/hidapi/
 }
 
 if [ ! -f $OPENSCADDIR/openscad.pro ]; then
