@@ -340,6 +340,7 @@ HEADERS += src/typedefs.h \
            src/LibraryInfoDialog.h \
            \
            src/input/InputDriver.h \
+           src/input/InputEventMapper.h \
            src/input/InputDriverManager.h
 
 SOURCES += src/version_check.cc \
@@ -440,6 +441,7 @@ SOURCES += src/version_check.cc \
            src/LibraryInfoDialog.cc \
            \
            src/input/InputDriver.cc \
+           src/input/InputEventMapper.cc \
            src/input/InputDriverManager.cc
 
 # ClipperLib

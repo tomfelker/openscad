@@ -10,7 +10,7 @@
 #include "renderer.h"
 #include "input/InputDriver.h"
 
-class QGLView : public QGLWidget, public GLView, public InputEventHandler
+class QGLView : public QGLWidget, public GLView
 {
 	Q_OBJECT
 	Q_PROPERTY(bool showFaces READ showFaces WRITE setShowFaces);
@@ -56,17 +56,17 @@ public slots:
 public:
 	QLabel *statusLabel;
 
+        void zoom(double v, bool relative);
+        void rotate(double x, double y, double z, bool relative);
+        void rotate2(double x, double y, double z);
+        void translate(double x, double y, double z, bool relative, bool viewPortRelative = true);
+
 private:
 	void init();
 
 	bool mouse_drag_active;
 	QPoint last_mouse;
 	QImage frame; // Used by grabFrame() and save()
-
-        void onTranslateEvent(const InputEventTranslate *event);
-        void onRotateEvent(const InputEventRotate *event);
-        void onButtonEvent(const InputEventButton *event);
-        void onZoomEvent(const InputEventZoom *event);
 
 	void wheelEvent(QWheelEvent *event);
 	void mousePressEvent(QMouseEvent *event);
@@ -79,10 +79,6 @@ private:
 
 	void paintGL();
 
-        void zoom(double v, bool relative);
-        void rotate(double x, double y, double z, bool relative);
-        void rotate2(double x, double y, double z);
-        void translate(double x, double y, double z, bool relative, bool viewPortRelative = true);
 	void normalizeAngle(GLdouble& angle);
 
 #ifdef ENABLE_OPENCSG
