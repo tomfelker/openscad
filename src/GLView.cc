@@ -168,6 +168,8 @@ void GLView::paintGlSsao()
   int width = cam.pixel_width;
   int height = cam.pixel_height;
      
+  cerr << "doing stuff yay" << endl;
+  
   GLuint colorTexture;
   glGenTextures(1, &colorTexture);
   glBindTexture(GL_TEXTURE_2D, colorTexture);
@@ -201,7 +203,11 @@ void GLView::paintGlSsao()
     exit(EXIT_FAILURE);
   }
     
+  cerr << "made some buffers, i heard u liek bufferkips" << endl;
+  
   paintGlSimple();
+  
+  cerr << "after here it's all my fault" << endl;
   
   // reset the camera - hmm, seems to work
   
@@ -237,11 +243,15 @@ void GLView::paintGlSsao()
   glVertex2f(-1, 1);
   glEnd();
   
+  cerr << "drew some stuff" << endl;
+  
   glUseProgram(0);
   
   glDeleteTextures(1, &colorTexture);
   glDeleteTextures(1, &depthTexture);
   glDeleteFramebuffers(1, &frameBuffer);
+  
+  cerr << "done" << endl;
 }
 
 void GLView::paintGlSimple()
@@ -376,11 +386,9 @@ void GLView::enable_opencsg_shaders()
       "varying vec3 tp, tr, tmp;\n"
       "varying float shading;\n"
       "void main() {\n"
-      "  gl_FragColor = vec4(color1.r * 0.5f, color1.g * shading, color1.b * shading, color1.a);\n"
+      "  gl_FragColor = vec4(color1.r * shading, color1.g * shading, color1.b * shading, color1.a);\n"
       "  if (tp.x < tr.x || tp.y < tr.y || tp.z < tr.z)\n"
       "    gl_FragColor = color2;\n"
-//      "  gl_FragColor.r = 1;\n"
-//	"asdf"
       "}\n";
 
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
@@ -450,8 +458,8 @@ void GLView::enable_ssao_shaders()
     "uniform float width;\n"
     "uniform float height;\n"
     "\n"
-    "float dx = 1.0f / width;\n"
-    "float dy = 1.0f / height;\n"
+    "float dx = 1.0 / width;\n"
+    "float dy = 1.0 / height;\n"
     "\n"
     "\n"
     "float depthAtOffset(int x, int y)\n"
@@ -464,15 +472,15 @@ void GLView::enable_ssao_shaders()
     "  float ret;\n"
     "  for(int x = 0; x < 5; ++x)\n"
     "    for(int y = 0; y < 5; ++y)\n"
-    "      ret += depthAtOffset(3 * (x - 2), 3 * (y - 2)) * (1.0f / 25.0f);\n"
+    "      ret += depthAtOffset(3 * (x - 2), 3 * (y - 2)) * (1.0 / 25.0);\n"
     "  return ret;\n"
     "}\n"
     "void main() {\n"
     "  float spatialImportanceFunction = blurredDepth() - depthAtOffset(0, 0);\n"
-    "  float spatialImportanceFunctionNegative = min(0.0f, spatialImportanceFunction);\n"
-    "  float darkening = 1.0f - min(0.3f, spatialImportanceFunctionNegative * -100.0f);\n"
+    "  float spatialImportanceFunctionNegative = min(0.0, spatialImportanceFunction);\n"
+    "  float darkening = 1.0 - min(0.3, spatialImportanceFunctionNegative * -100.0);\n"
     "  vec4 colorValue = texture2D(colorSampler, gl_TexCoord[0].xy);\n"
-    "  gl_FragColor = vec4(colorValue.r * darkening, colorValue.g * darkening, colorValue.b * darkening, 1.0f);\n"
+    "  gl_FragColor = vec4(colorValue.r * darkening, colorValue.g * darkening, colorValue.b * darkening, 1.0);\n"
     "}\n";
 
   GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
