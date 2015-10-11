@@ -6,6 +6,7 @@
 #include "mathc99.h"
 #include "printutils.h"
 #include "renderer.h"
+#include "fbo.h"
 
 #ifdef _WIN32
 #include <GL/wglew.h>
@@ -18,6 +19,8 @@
 #endif
 
 #include <boost/lexical_cast.hpp>
+
+using namespace std;
 
 GLView::GLView()
 {
@@ -155,6 +158,92 @@ void GLView::setupCamera()
 
 void GLView::paintGL()
 {
+	//paintGlSimple();
+	paintGlSsao();
+}
+
+void GLView::paintGlSsao()
+{
+  // TODO: better way to get these?
+  int width = cam.pixel_width;
+  int height = cam.pixel_height;
+     
+  GLuint colorTexture;
+  glGenTextures(1, &colorTexture);
+  glBindTexture(GL_TEXTURE_2D, colorTexture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  
+  GLuint depthTexture;
+  glGenTextures(1, &depthTexture);
+  glBindTexture(GL_TEXTURE_2D, depthTexture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8_EXT, width, height, 0, GL_DEPTH_STENCIL_EXT, GL_UNSIGNED_INT_24_8_EXT, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+
+  GLuint frameBuffer;
+  glGenFramebuffers(1, &frameBuffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
+
+  
+  GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if(status != GL_FRAMEBUFFER_COMPLETE)
+  {
+		cerr << "nooo, noooo...." << endl;
+    exit(EXIT_FAILURE);
+  }
+    
+  paintGlSimple();
+  
+  // reset the camera - hmm, seems to work
+  
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  
+  
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  
+  glActiveTexture(GL_TEXTURE0 + 0);
+  glBindTexture(GL_TEXTURE_2D, colorTexture);
+  
+  glActiveTexture(GL_TEXTURE0 + 1);
+  glBindTexture(GL_TEXTURE_2D, depthTexture);
+    
+  glUseProgram(ssao_shader.program);
+  
+  glUniform1i(ssao_shader.colorTextureLocation, 0);
+  glUniform1i(ssao_shader.depthTextureLocation, 1);
+  
+  glBegin(GL_QUADS);
+  glTexCoord2f(0, 0);
+  glVertex2f(-1, -1);
+  glTexCoord2f(1, 0);
+  glVertex2f(1, -1);
+  glTexCoord2f(1, 1);
+  glVertex2f(1, 1);
+  glTexCoord2f(0, 1);
+  glVertex2f(-1, 1);
+  glEnd();
+  
+  glUseProgram(0);
+  
+  glDeleteTextures(1, &colorTexture);
+  glDeleteTextures(1, &depthTexture);
+  glDeleteFramebuffers(1, &frameBuffer);
+}
+
+void GLView::paintGlSimple()
+{
   glDisable(GL_LIGHTING);
 
   Color4f bgcol = ColorMap::getColor(*this->colorscheme, BACKGROUND_COLOR);
@@ -285,9 +374,11 @@ void GLView::enable_opencsg_shaders()
       "varying vec3 tp, tr, tmp;\n"
       "varying float shading;\n"
       "void main() {\n"
-      "  gl_FragColor = vec4(color1.r * shading, color1.g * shading, color1.b * shading, color1.a);\n"
+      "  gl_FragColor = vec4(color1.r * 0.5f, color1.g * shading, color1.b * shading, color1.a);\n"
       "  if (tp.x < tr.x || tp.y < tr.y || tp.z < tr.z)\n"
       "    gl_FragColor = color2;\n"
+//      "  gl_FragColor.r = 1;\n"
+//	"asdf"
       "}\n";
 
     GLuint vs = glCreateShader(GL_VERTEX_SHADER);
@@ -325,22 +416,105 @@ void GLView::enable_opencsg_shaders()
       char logbuffer[1000];
       glGetProgramInfoLog(edgeshader_prog, sizeof(logbuffer), &loglen, logbuffer);
       fprintf(stderr, "OpenGL Program Linker Error:\n%.*s", loglen, logbuffer);
+      exit(EXIT_FAILURE);
     } else {
       int loglen;
       char logbuffer[1000];
       glGetProgramInfoLog(edgeshader_prog, sizeof(logbuffer), &loglen, logbuffer);
       if (loglen > 0) {
         fprintf(stderr, "OpenGL Program Link OK:\n%.*s", loglen, logbuffer);
+        exit(EXIT_FAILURE);
       }
       glValidateProgram(edgeshader_prog);
       glGetProgramInfoLog(edgeshader_prog, sizeof(logbuffer), &loglen, logbuffer);
       if (loglen > 0) {
         fprintf(stderr, "OpenGL Program Validation results:\n%.*s", loglen, logbuffer);
+        exit(EXIT_FAILURE);
       }
     }
   }
 }
 #endif
+
+
+void GLView::enable_ssao_shaders()
+{
+  // if I do want to linearize the depth, I can use http://www.geeks3d.com/20091216/geexlab-how-to-visualize-the-depth-buffer-in-glsl/
+  // basic idea is going to be this
+  
+  const char *fs_source =
+    "uniform sampler2D colorSampler;\n"
+    "uniform sampler2D depthSampler;\n"
+    "\n"
+    "void main() {\n"
+    //"  gl_FragColor = vec4(gl_FragCoord.x / 500.0f, gl_FragCoord.y / 500.0f, 1.0f, 1.0f);\n"      
+    
+    //"  gl_FragColor = texture2D(colorSampler, gl_TexCoord[0].xy) + .5f * vec4(gl_TexCoord[0].x, gl_TexCoord[0].y, 1.0f, 1.0f);\n"      
+    
+    
+    "  float depthValue = texture2D(depthSampler, gl_TexCoord[0].xy).x / gl_FragCoord.w;\n"
+    "  vec4 colorValue = texture2D(colorSampler, gl_TexCoord[0].xy);\n"
+    "  gl_FragColor = colorValue;\n"
+    "  gl_FragColor = vec4(depthValue, depthValue, depthValue, 1.0f);\n"
+    
+    "}\n";
+
+  GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource(fs, 1, (const GLchar**)&fs_source, NULL);
+  glCompileShader(fs);
+
+  
+  
+  ssao_shader.program = glCreateProgram();
+  glAttachShader(ssao_shader.program, fs);
+  glLinkProgram(ssao_shader.program);
+
+
+  ssao_shader.colorTextureLocation = glGetUniformLocation(ssao_shader.program, "colorSampler");
+  ssao_shader.depthTextureLocation = glGetUniformLocation(ssao_shader.program, "depthSampler");
+  
+  GLenum err = glGetError();
+  if (err != GL_NO_ERROR) {
+    fprintf(stderr, "OpenGL Error: %s\n", gluErrorString(err));
+  }
+
+  
+  GLint status;
+  glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
+  if (status == GL_FALSE) {
+    int loglen;
+    char logbuffer[1000];
+    glGetShaderInfoLog(fs, sizeof(logbuffer), &loglen, logbuffer);
+    fprintf(stderr, "OpenGL Program Compile Error:\n%.*s\n", loglen, logbuffer);
+    exit(EXIT_FAILURE);
+  }
+  
+  glGetProgramiv(ssao_shader.program, GL_LINK_STATUS, &status);
+  if (status == GL_FALSE) {
+    int loglen;
+    char logbuffer[1000];
+    glGetProgramInfoLog(ssao_shader.program, sizeof(logbuffer), &loglen, logbuffer);
+    fprintf(stderr, "OpenGL Program Linker Error:\n%.*s\n", loglen, logbuffer);
+    exit(EXIT_FAILURE);
+  } else {
+    int loglen;
+    char logbuffer[1000];
+    glGetProgramInfoLog(ssao_shader.program, sizeof(logbuffer), &loglen, logbuffer);
+    if (loglen > 0) {
+      fprintf(stderr, "OpenGL Program Link OK:\n%.*s\n", loglen, logbuffer);
+      exit(EXIT_FAILURE);
+    }
+    glValidateProgram(ssao_shader.program);
+    glGetProgramInfoLog(ssao_shader.program, sizeof(logbuffer), &loglen, logbuffer);
+    if (loglen > 0) {
+      fprintf(stderr, "OpenGL Program Validation results:\n%.*s\n", loglen, logbuffer);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+}
+
+
 
 void GLView::initializeGL()
 {
@@ -370,6 +544,7 @@ void GLView::initializeGL()
 #ifdef ENABLE_OPENCSG
   enable_opencsg_shaders();
 #endif
+  enable_ssao_shaders();
 }
 
 void GLView::showSmallaxes(const Color4f &col)

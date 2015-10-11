@@ -79,4 +79,16 @@ private:
 	void showSmallaxes(const Color4f &col);
 	void showScalemarkers(const Color4f &col);
 	void decodeMarkerValue(double i, double l, int size_div_sm);
+
+	void paintGlSimple();
+	void paintGlSsao();
+	void enable_ssao_shaders();
+	
+	struct {
+		GLint program;
+		GLint colorTextureLocation;
+		GLint depthTextureLocation;
+	} ssao_shader;
+
+//	class fbo_t *fbo;
 };
