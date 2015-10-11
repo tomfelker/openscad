@@ -22,6 +22,20 @@
 
 using namespace std;
 
+
+#define checkGlError() checkGlErrorInternal(__FILE__, __LINE__)
+void checkGlErrorInternal(const char *file, int line)
+{
+  GLenum glErr;
+  glErr = glGetError();
+  if(glErr != GL_NO_ERROR)
+  {
+    cerr << "gl error in " << file << ":" << line << " - " << gluErrorString(glErr) << endl;
+    exit(EXIT_FAILURE);
+  }
+}
+
+
 GLView::GLView()
 {
   showedges = false;
@@ -201,7 +215,11 @@ void GLView::paintGlSsao()
     exit(EXIT_FAILURE);
   }
     
+  checkGlError();
+  
   paintGlSimple();
+  
+  checkGlError();
   
   // reset the camera - hmm, seems to work
   
@@ -238,6 +256,7 @@ void GLView::paintGlSsao()
   glEnd();
   
   glUseProgram(0);
+  glActiveTexture(GL_TEXTURE0 + 0);
   
   glDeleteTextures(1, &colorTexture);
   glDeleteTextures(1, &depthTexture);
@@ -253,6 +272,8 @@ void GLView::paintGlSimple()
   glClearColor(bgcol[0], bgcol[1], bgcol[2], 1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+  checkGlError();
+  
   setupCamera();
   if (this->cam.type) {
     // Only for GIMBAL cam
@@ -264,6 +285,8 @@ void GLView::paintGlSimple()
     // mark the scale along the axis lines
     if (showaxes && showscale) GLView::showScalemarkers(axescolor);
   }
+  
+  checkGlError();
 
   glEnable(GL_LIGHTING);
   glDepthFunc(GL_LESS);
@@ -272,6 +295,9 @@ void GLView::paintGlSimple()
   glLineWidth(2);
   glColor3d(1.0, 0.0, 0.0);
 
+  
+  checkGlError();
+  
   if (this->renderer) {
 #if defined(ENABLE_OPENCSG)
     // FIXME: This belongs in the OpenCSG renderer, but it doesn't know about this ID yet
@@ -280,9 +306,13 @@ void GLView::paintGlSimple()
     this->renderer->draw(showfaces, showedges);
   }
 
+  checkGlError();
+  
   // Only for GIMBAL
   glDisable(GL_LIGHTING);
   if (showaxes) GLView::showSmallaxes(axescolor);
+  
+  checkGlError();
 }
 
 #ifdef ENABLE_OPENCSG
