@@ -223,6 +223,8 @@ void GLView::paintGlSsao()
   
   glUniform1i(ssao_shader.colorTextureLocation, 0);
   glUniform1i(ssao_shader.depthTextureLocation, 1);
+  glUniform1f(ssao_shader.widthLocation, width);
+  glUniform1f(ssao_shader.heightLocation, height);
   
   glBegin(GL_QUADS);
   glTexCoord2f(0, 0);
@@ -445,18 +447,32 @@ void GLView::enable_ssao_shaders()
   const char *fs_source =
     "uniform sampler2D colorSampler;\n"
     "uniform sampler2D depthSampler;\n"
+    "uniform float width;\n"
+    "uniform float height;\n"
     "\n"
+    "float dx = 1.0f / width;\n"
+    "float dy = 1.0f / height;\n"
+    "\n"
+    "\n"
+    "float depthAtOffset(int x, int y)\n"
+    "{\n"
+    "  return texture2D(depthSampler, gl_TexCoord[0].xy + vec2(float(x) * dx, float(y) * dy)).x;\n"
+    "}\n"
+    "\n"
+    "float blurredDepth()\n"
+    "{\n"
+    "  float ret;\n"
+    "  for(int x = 0; x < 5; ++x)\n"
+    "    for(int y = 0; y < 5; ++y)\n"
+    "      ret += depthAtOffset(3 * (x - 2), 3 * (y - 2)) * (1.0f / 25.0f);\n"
+    "  return ret;\n"
+    "}\n"
     "void main() {\n"
-    //"  gl_FragColor = vec4(gl_FragCoord.x / 500.0f, gl_FragCoord.y / 500.0f, 1.0f, 1.0f);\n"      
-    
-    //"  gl_FragColor = texture2D(colorSampler, gl_TexCoord[0].xy) + .5f * vec4(gl_TexCoord[0].x, gl_TexCoord[0].y, 1.0f, 1.0f);\n"      
-    
-    
-    "  float depthValue = texture2D(depthSampler, gl_TexCoord[0].xy).x / gl_FragCoord.w;\n"
+    "  float spatialImportanceFunction = blurredDepth() - depthAtOffset(0, 0);\n"
+    "  float spatialImportanceFunctionNegative = min(0.0f, spatialImportanceFunction);\n"
+    "  float darkening = 1.0f - min(0.3f, spatialImportanceFunctionNegative * -100.0f);\n"
     "  vec4 colorValue = texture2D(colorSampler, gl_TexCoord[0].xy);\n"
-    "  gl_FragColor = colorValue;\n"
-    "  gl_FragColor = vec4(depthValue, depthValue, depthValue, 1.0f);\n"
-    
+    "  gl_FragColor = vec4(colorValue.r * darkening, colorValue.g * darkening, colorValue.b * darkening, 1.0f);\n"
     "}\n";
 
   GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
@@ -472,6 +488,8 @@ void GLView::enable_ssao_shaders()
 
   ssao_shader.colorTextureLocation = glGetUniformLocation(ssao_shader.program, "colorSampler");
   ssao_shader.depthTextureLocation = glGetUniformLocation(ssao_shader.program, "depthSampler");
+  ssao_shader.widthLocation = glGetUniformLocation(ssao_shader.program, "width");
+  ssao_shader.heightLocation = glGetUniformLocation(ssao_shader.program, "height");
   
   GLenum err = glGetError();
   if (err != GL_NO_ERROR) {

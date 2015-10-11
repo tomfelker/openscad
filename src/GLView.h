@@ -88,6 +88,8 @@ private:
 		GLint program;
 		GLint colorTextureLocation;
 		GLint depthTextureLocation;
+		GLint heightLocation;
+		GLint widthLocation;
 	} ssao_shader;
 
 //	class fbo_t *fbo;
