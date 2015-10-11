@@ -22,6 +22,24 @@
 
 using namespace std;
 
+
+#define checkGlError() checkGlErrorInternal(__FILE__, __LINE__)
+void checkGlErrorInternal(const char *file, int line)
+{
+  GLenum glErr;
+  glErr = glGetError();
+  if(glErr != GL_NO_ERROR)
+  {
+    cerr << "gl error in " << file << ":" << line << " - " << gluErrorString(glErr) << endl;
+    exit(EXIT_FAILURE);
+  }
+  else
+  {
+    cerr << "okay at " << file << ":" << line << endl;
+  }
+}
+
+
 GLView::GLView()
 {
   showedges = false;
@@ -179,6 +197,8 @@ void GLView::paintGlSsao()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   
+	checkGlError();
+	
   GLuint depthTexture;
   glGenTextures(1, &depthTexture);
   glBindTexture(GL_TEXTURE_2D, depthTexture);
@@ -188,15 +208,23 @@ void GLView::paintGlSsao()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
-
-  GLuint frameBuffer;
-  glGenFramebuffers(1, &frameBuffer);
-  glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
-
+  checkGlError();
   
-  GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+  
+  GLuint frameBuffer;
+  glGenFramebuffersEXT(1, &frameBuffer);  
+  checkGlError();  
+  glBindFramebufferEXT(GL_FRAMEBUFFER, frameBuffer);
+  checkGlError();
+  glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, colorTexture, 0);
+  checkGlError();
+  glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexture, 0);
+  checkGlError();
+
+  checkGlError();
+  
+  
+  GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
 	if(status != GL_FRAMEBUFFER_COMPLETE)
   {
 		cerr << "nooo, noooo...." << endl;
@@ -204,10 +232,14 @@ void GLView::paintGlSsao()
   }
     
   cerr << "made some buffers, i heard u liek bufferkips" << endl;
-  
+  checkGlError();
+
+	
   paintGlSimple();
   
   cerr << "after here it's all my fault" << endl;
+  checkGlError();
+  
   
   // reset the camera - hmm, seems to work
   
@@ -217,7 +249,7 @@ void GLView::paintGlSsao()
   glLoadIdentity();
   
   
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
   
   glActiveTexture(GL_TEXTURE0 + 0);
   glBindTexture(GL_TEXTURE_2D, colorTexture);
@@ -246,10 +278,11 @@ void GLView::paintGlSsao()
   cerr << "drew some stuff" << endl;
   
   glUseProgram(0);
+  glActiveTexture(GL_TEXTURE0 + 0);
   
   glDeleteTextures(1, &colorTexture);
   glDeleteTextures(1, &depthTexture);
-  glDeleteFramebuffers(1, &frameBuffer);
+  glDeleteFramebuffersEXT(1, &frameBuffer);
   
   cerr << "done" << endl;
 }
@@ -263,6 +296,8 @@ void GLView::paintGlSimple()
   glClearColor(bgcol[0], bgcol[1], bgcol[2], 1.0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+  checkGlError();
+  
   setupCamera();
   if (this->cam.type) {
     // Only for GIMBAL cam
@@ -274,6 +309,8 @@ void GLView::paintGlSimple()
     // mark the scale along the axis lines
     if (showaxes && showscale) GLView::showScalemarkers(axescolor);
   }
+  
+  checkGlError();
 
   glEnable(GL_LIGHTING);
   glDepthFunc(GL_LESS);
@@ -282,6 +319,9 @@ void GLView::paintGlSimple()
   glLineWidth(2);
   glColor3d(1.0, 0.0, 0.0);
 
+  
+  checkGlError();
+  
   if (this->renderer) {
 #if defined(ENABLE_OPENCSG)
     // FIXME: This belongs in the OpenCSG renderer, but it doesn't know about this ID yet
@@ -290,9 +330,13 @@ void GLView::paintGlSimple()
     this->renderer->draw(showfaces, showedges);
   }
 
+  checkGlError();
+  
   // Only for GIMBAL
   glDisable(GL_LIGHTING);
   if (showaxes) GLView::showSmallaxes(axescolor);
+  
+  checkGlError();
 }
 
 #ifdef ENABLE_OPENCSG
