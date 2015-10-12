@@ -79,10 +79,19 @@ private:
 	void showSmallaxes(const Color4f &col);
 	void showScalemarkers(const Color4f &col);
 	void decodeMarkerValue(double i, double l, int size_div_sm);
-
-	void paintGlSimple();
-	void paintGlSsao();
-	void enable_ssao_shaders();
+	void paintGlInternal();
+	
+#if defined(ENABLE_OPENCSG) || defined(ENABLE_GL_POSTPROCESS)
+	static bool gl20isDisabled();
+	static GLint buildShaderProgram(const char *debugName, const char *vertexShaderSource, const char *fragmentShaderSource);
+#endif // #if defined(ENABLE_OPENCSG) || defined(ENABLE_GL_POSTPROCESS)
+	
+#ifdef ENABLE_GL_POSTPROCESS
+	
+	bool canPostprocess();
+	
+	void paintGlWithPostprocess();
+	void compilePostprocessShaders();
 	
 	struct {
 		GLint program;
@@ -92,5 +101,7 @@ private:
 		GLint widthLocation;
 	} ssao_shader;
 
+#endif // #ifdef ENABLE_GL_POSTPROCESS
+	
 //	class fbo_t *fbo;
 };

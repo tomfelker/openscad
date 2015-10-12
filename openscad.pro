@@ -195,6 +195,7 @@ CONFIG += gettext
 # Make experimental features available
 experimental {
   DEFINES += ENABLE_EXPERIMENTAL
+  DEFINES += ENABLE_GL_POSTPROCESS
 }
 
 nogui {
