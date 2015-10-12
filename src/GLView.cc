@@ -27,13 +27,11 @@ void checkGlErrorInternal(const char *file, int line)
 {
   GLenum glErr;
   glErr = glGetError();
-  if(glErr != GL_NO_ERROR)
-  {
+  if(glErr != GL_NO_ERROR) {
     cerr << "gl error in " << file << ":" << line << " - " << gluErrorString(glErr) << endl;
     exit(EXIT_FAILURE);
   }
-  else
-  {
+  else {
     //cerr << "gl okay at " << file << ":" << line << endl;
   }
 }
@@ -327,15 +325,17 @@ void GLView::enable_opencsg_shaders()
       "}\n";
 
     GLint edgeshader_prog = buildShaderProgram("edgeshader_prog", vs_source, fs_source);
-    shaderinfo[0] = edgeshader_prog;
-    shaderinfo[1] = glGetUniformLocation(edgeshader_prog, "color1");
-    shaderinfo[2] = glGetUniformLocation(edgeshader_prog, "color2");
-    shaderinfo[3] = glGetAttribLocation(edgeshader_prog, "trig");
-    shaderinfo[4] = glGetAttribLocation(edgeshader_prog, "pos_b");
-    shaderinfo[5] = glGetAttribLocation(edgeshader_prog, "pos_c");
-    shaderinfo[6] = glGetAttribLocation(edgeshader_prog, "mask");
-    shaderinfo[7] = glGetUniformLocation(edgeshader_prog, "xscale");
-    shaderinfo[8] = glGetUniformLocation(edgeshader_prog, "yscale");
+    if(edgeshader_prog) {
+      shaderinfo[0] = edgeshader_prog;
+      shaderinfo[1] = glGetUniformLocation(edgeshader_prog, "color1");
+      shaderinfo[2] = glGetUniformLocation(edgeshader_prog, "color2");
+      shaderinfo[3] = glGetAttribLocation(edgeshader_prog, "trig");
+      shaderinfo[4] = glGetAttribLocation(edgeshader_prog, "pos_b");
+      shaderinfo[5] = glGetAttribLocation(edgeshader_prog, "pos_c");
+      shaderinfo[6] = glGetAttribLocation(edgeshader_prog, "mask");
+      shaderinfo[7] = glGetUniformLocation(edgeshader_prog, "xscale");
+      shaderinfo[8] = glGetUniformLocation(edgeshader_prog, "yscale");
+    }
   }
 }
 #endif
@@ -878,7 +878,7 @@ GLint GLView::buildShaderProgram(const char *debugName, const char *vertexShader
     glGetShaderiv(vs, GL_COMPILE_STATUS, &status);
     if(status == GL_FALSE) {
       loglen = 0;
-      logbuffer[0] = '\0';
+      memset(logbuffer, 0, sizeof(logbuffer));
       glGetShaderInfoLog(vs, sizeof(logbuffer), &loglen, logbuffer);
       cerr << "vertex shader compile error for " << debugName << ": " << logbuffer << endl;
       return 0;
@@ -897,8 +897,9 @@ GLint GLView::buildShaderProgram(const char *debugName, const char *vertexShader
     glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
     if(status == GL_FALSE) {
       loglen = 0;
-      logbuffer[0] = '\0';
+      memset(logbuffer, 0, sizeof(logbuffer));
       glGetShaderInfoLog(fs, sizeof(logbuffer), &loglen, logbuffer);
+
       cerr << "fragment shader compile error for " << debugName << ": " << logbuffer << endl;
       return 0;
     }
@@ -913,13 +914,13 @@ GLint GLView::buildShaderProgram(const char *debugName, const char *vertexShader
   glGetProgramiv(program, GL_LINK_STATUS, &status);
   if (status == GL_FALSE) {
     loglen = 0;
-    logbuffer[0] = '\0';
+    memset(logbuffer, 0, sizeof(logbuffer));
     glGetProgramInfoLog(program, sizeof(logbuffer), &loglen, logbuffer);
     cerr << "shader link error for " << debugName << ": " << logbuffer << endl;
     return 0;
   } else {
     loglen = 0;
-    logbuffer[0] = '\0';
+    memset(logbuffer, 0, sizeof(logbuffer));
     glGetProgramInfoLog(program, sizeof(logbuffer), &loglen, logbuffer);
     if (loglen > 0) {
       cerr << "shader link warning for " << debugName << ": " << logbuffer << endl;
@@ -950,9 +951,39 @@ bool GLView::canPostprocess()
   return false;  
 }
 
+
+void GLView::drawFullscreenQuad()
+{    
+  checkGlError();
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  checkGlError();  
+  
+  glBegin(GL_QUADS);
+  glTexCoord2f(0, 0);
+  glVertex2f(-1, -1);
+  glTexCoord2f(1, 0);
+  glVertex2f(1, -1);
+  glTexCoord2f(1, 1);
+  glVertex2f(1, 1);
+  glTexCoord2f(0, 1);
+  glVertex2f(-1, 1);
+  glEnd();
+
+  checkGlError();  
+}
+
+
 void GLView::paintGlWithPostprocess()
-{
-  if(ssao_shader.program == 0) {
+{  
+  if(ssao_shader.program == 0 || blur_shader.program == 0) {    
+    static bool alreadyComplained = false;
+    if(!alreadyComplained) {
+      alreadyComplained = true;
+      cerr << "Something went wrong with shaders, not doing post process effects" << endl;
+    }    
     paintGlInternal();
     return;
   }
@@ -961,6 +992,8 @@ void GLView::paintGlWithPostprocess()
   int width = cam.pixel_width;
   int height = cam.pixel_height;
   
+  // allocate our buffers
+  // TODO: don't re-allocate this stuff every frame
   GLuint colorTexture;
   glGenTextures(1, &colorTexture);
   glBindTexture(GL_TEXTURE_2D, colorTexture);
@@ -981,19 +1014,50 @@ void GLView::paintGlWithPostprocess()
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+  checkGlError();  
+  
+  GLuint horizontalBlurredDepthTexture;
+  glGenTextures(1, &horizontalBlurredDepthTexture);
+  glBindTexture(GL_TEXTURE_2D, horizontalBlurredDepthTexture);
+  
+  // GL_RGBA32F works, but is a bit wasteful
+  //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+  // this works great with software renderer, but hardware renderer seems to use fall back to GL_R8, causing banding
+  //glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, 0);
+  // this also falls back
+  //glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_R32F, GL_FLOAT, 0);
+  
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+  checkGlError();
+  
+  GLuint fullyBlurredDepthTexture;
+  glGenTextures(1, &fullyBlurredDepthTexture);
+  glBindTexture(GL_TEXTURE_2D, fullyBlurredDepthTexture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, 0);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
   checkGlError();
   
   
   GLuint frameBuffer;
   glGenFramebuffersEXT(1, &frameBuffer);  
   checkGlError();  
+  
+  // set up to render as usual, but going to our textures instead of the screen  
   glBindFramebufferEXT(GL_FRAMEBUFFER, frameBuffer);
   checkGlError();
   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, colorTexture, 0);
   checkGlError();
   glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTexture, 0);
-  checkGlError();
-  
+  checkGlError();  
   GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
 	if(status != GL_FRAMEBUFFER_COMPLETE)
   {
@@ -1001,50 +1065,85 @@ void GLView::paintGlWithPostprocess()
     exit(EXIT_FAILURE);
   }
 	
-  paintGlInternal();
-  
+  // do the usual render
+  paintGlInternal();  
   checkGlError();
   
-  // reset the camera - hmm, seems to work
+   
+  // configure buffers and draw horizontal blur
+  glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, horizontalBlurredDepthTexture, 0);
+  checkGlError();  
+  glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, 0, 0);  // need to unbind depth so it doesn't get clobbered here (and we don't need it anyway)
+  checkGlError();  
+  glActiveTexture(GL_TEXTURE0 + 0);
+  glBindTexture(GL_TEXTURE_2D, depthTexture);
   
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
+  glUseProgram(blur_shader.program);  
+  glUniform1i(blur_shader.inputLuminanceTextureLocation, 0);
+  glUniform1f(blur_shader.widthLocation, width);
+  glUniform1f(blur_shader.heightLocation, height);
+  glUniform1i(blur_shader.dirLocation, 0); // horizontal
+  checkGlError();
+  if(status != GL_FRAMEBUFFER_COMPLETE)
+  {
+		cerr << "GLView::paintGlWithPostprocess(): framebuffer status was bad." << endl;
+    exit(EXIT_FAILURE);
+  }
+  glDisable(GL_DEPTH_TEST); // needed?
+  drawFullscreenQuad();
+  checkGlError();
   
+  // now for the vertical blur (uses a lot of state from above
+  glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, fullyBlurredDepthTexture, 0);
+  checkGlError();  
+  glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, 0, 0);  // need to unbind depth so it doesn't get clobbered here (and we don't need it anyway)
+  checkGlError();    
+  glActiveTexture(GL_TEXTURE0 + 0);
+  glBindTexture(GL_TEXTURE_2D, horizontalBlurredDepthTexture);
   
+  glUseProgram(blur_shader.program);  
+  glUniform1i(blur_shader.inputLuminanceTextureLocation, 0);
+  glUniform1f(blur_shader.widthLocation, width);
+  glUniform1f(blur_shader.heightLocation, height);
+  glUniform1i(blur_shader.dirLocation, 1); // vertical
+  checkGlError();
+  if(status != GL_FRAMEBUFFER_COMPLETE)
+  {
+		cerr << "GLView::paintGlWithPostprocess(): framebuffer status was bad." << endl;
+    exit(EXIT_FAILURE);
+  }  
+  drawFullscreenQuad();
+    
+  // now back to rendering on the screen
   glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
   
+  // set up and run the ssao shader
   glActiveTexture(GL_TEXTURE0 + 0);
-  glBindTexture(GL_TEXTURE_2D, colorTexture);
-  
+  glBindTexture(GL_TEXTURE_2D, colorTexture);  
   glActiveTexture(GL_TEXTURE0 + 1);
-  glBindTexture(GL_TEXTURE_2D, depthTexture);
-    
-  glUseProgram(ssao_shader.program);
-  
+  glBindTexture(GL_TEXTURE_2D, depthTexture);    
+  glActiveTexture(GL_TEXTURE0 + 2);
+  glBindTexture(GL_TEXTURE_2D, fullyBlurredDepthTexture);
+  glUseProgram(ssao_shader.program);  
   glUniform1i(ssao_shader.colorTextureLocation, 0);
   glUniform1i(ssao_shader.depthTextureLocation, 1);
+  glUniform1i(ssao_shader.blurredDepthTextureLocation, 2);
   glUniform1f(ssao_shader.widthLocation, width);
   glUniform1f(ssao_shader.heightLocation, height);
+  drawFullscreenQuad();
   
-  glBegin(GL_QUADS);
-  glTexCoord2f(0, 0);
-  glVertex2f(-1, -1);
-  glTexCoord2f(1, 0);
-  glVertex2f(1, -1);
-  glTexCoord2f(1, 1);
-  glVertex2f(1, 1);
-  glTexCoord2f(0, 1);
-  glVertex2f(-1, 1);
-  glEnd();
-  
+  // restore state
   glUseProgram(0);
   glActiveTexture(GL_TEXTURE0 + 0);
+  glEnable(GL_DEPTH_TEST);
   
   glDeleteTextures(1, &colorTexture);
   glDeleteTextures(1, &depthTexture);
+  glDeleteTextures(1, &horizontalBlurredDepthTexture);
+  glDeleteTextures(1, &fullyBlurredDepthTexture);
+    
   glDeleteFramebuffersEXT(1, &frameBuffer);
+  checkGlError();
 }
 
 
@@ -1053,52 +1152,116 @@ void GLView::compilePostprocessShaders()
   // if I do want to linearize the depth, I can use http://www.geeks3d.com/20091216/geexlab-how-to-visualize-the-depth-buffer-in-glsl/
   // basic idea is going to be this
   
-  const char *fs_source =
+  const char *ssao_fs_source =
     "uniform sampler2D colorSampler;\n"
     "uniform sampler2D depthSampler;\n"
+    "uniform sampler2D blurredDepthSampler;\n"
     "uniform float width;\n"
     "uniform float height;\n"
     "\n"
     "float dx = 1.0 / width;\n"
     "float dy = 1.0 / height;\n"
     "\n"
-    "\n"
-    "float depthAtOffset(int x, int y)\n"
-    "{\n"
-    "  return texture2D(depthSampler, gl_TexCoord[0].xy + vec2(float(x) * dx, float(y) * dy)).x;\n"
+    "float blurredDepth()\n"
+    "{\n"    
+    "  return texture2D(blurredDepthSampler, gl_TexCoord[0].xy).x;\n"
     "}\n"
     "\n"
-    "float blurredDepth()\n"
-    "{\n"
-    "  float ret;\n"
-    "  for(int x = 0; x < 5; ++x)\n"
-    "    for(int y = 0; y < 5; ++y)\n"
-    "      ret += depthAtOffset(3 * (x - 2), 3 * (y - 2)) * (1.0 / 25.0);\n"
-    "  return ret;\n"
+    "float depth()\n"
+    "{\n"    
+    "  return texture2D(depthSampler, gl_TexCoord[0].xy).x;\n"
     "}\n"
     "void main() {\n"
-    "  float spatialImportanceFunction = blurredDepth() - depthAtOffset(0, 0);\n"
+    "  float spatialImportanceFunction = blurredDepth() - depth();\n"
     "  float spatialImportanceFunctionNegative = min(0.0, spatialImportanceFunction);\n"
     "  float darkening = 1.0 - min(0.3, spatialImportanceFunctionNegative * -100.0);\n"
     "  vec4 colorValue = texture2D(colorSampler, gl_TexCoord[0].xy);\n"
     "  gl_FragColor = vec4(colorValue.r * darkening, colorValue.g * darkening, colorValue.b * darkening, 1.0);\n"
+    
+    // for debugging
+    //"  gl_FragColor = vec4(blurredDepth(), 0, 0, 1);\n"
+    
+    //"  gl_FragColor = vec4(blurredDepth(), depth(), 0, 1);\n"
+    
     "}\n";
 
   
-  if(!canPostprocess())
-  {
+  const char *blur_vs_source =
+    "#version 120\n"
+    "uniform float width;\n"
+    "uniform float height;\n"
+    "uniform int dir;\n"
+    "\n"
+    "varying vec2[11] sampleCoords;\n"
+    "\n"
+    "void main() {\n"
+    "  gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * gl_Vertex;\n"
+    "\n"
+    "  float dx = 0;\n"
+    "  float dy = 0;\n"
+    "  if(dir == 0)\n"
+    "    dx = 1.0 / width;\n"
+    "  else\n"
+    "    dy = 1.0 / height;\n"
+    "\n"
+    "  for(int i = 0; i < 11; ++i) {\n"
+    // hrm, need to figure how to get texture coord instead
+    "    vec2 coord = (gl_Position.xy + vec2(1, 1)) * .5;\n"
+    "    sampleCoords[i] = coord + float(i - 5) * vec2(dx, dy);\n"
+    "  }\n"
+    "}\n";
+  
+  // coefficiens from http://dev.theomader.com/gaussian-kernel-calculator/
+  // with sigma 2 kernel size 11 (.6% outside the kernel)
+  
+  const char *blur_fs_source =
+    "#version 120\n"
+    "uniform sampler2D luminanceSampler;\n"
+    "varying vec2[11] sampleCoords;\n"
+    "\n"
+    "void main() {\n"
+    "  float accum = 0;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 0]).x * 0.0093;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 1]).x * 0.028002;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 2]).x * 0.065984;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 3]).x * 0.121703;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 4]).x * 0.175713;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 5]).x * 0.198596;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 6]).x * 0.175713;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 7]).x * 0.121703;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 8]).x * 0.065984;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[ 9]).x * 0.028002;\n"
+    "  accum += texture2D(luminanceSampler, sampleCoords[10]).x * 0.0093;\n"
+    // hmm, why is it still alpha blending?
+    "  gl_FragColor = vec4(accum, accum, accum, 1);\n"
+    "}\n";  
+  
+  if(!canPostprocess()) {
     cerr << "Your system's OpenGL libraries can't support postprocess effects." << endl; 
     ssao_shader.program = 0;
+    blur_shader.program = 0;
     return;
   }  
   
-  ssao_shader.program = buildShaderProgram("ssao_shader", NULL, fs_source);
-    
-  ssao_shader.colorTextureLocation = glGetUniformLocation(ssao_shader.program, "colorSampler");
-  ssao_shader.depthTextureLocation = glGetUniformLocation(ssao_shader.program, "depthSampler");
-  ssao_shader.widthLocation = glGetUniformLocation(ssao_shader.program, "width");
-  ssao_shader.heightLocation = glGetUniformLocation(ssao_shader.program, "height");  
+  ssao_shader.program = buildShaderProgram("ssao_shader", NULL, ssao_fs_source);
+  
+  if(ssao_shader.program) {
+    ssao_shader.colorTextureLocation = glGetUniformLocation(ssao_shader.program, "colorSampler");
+    ssao_shader.depthTextureLocation = glGetUniformLocation(ssao_shader.program, "depthSampler");
+    ssao_shader.blurredDepthTextureLocation = glGetUniformLocation(ssao_shader.program, "blurredDepthSampler");
+    ssao_shader.widthLocation = glGetUniformLocation(ssao_shader.program, "width");
+    ssao_shader.heightLocation = glGetUniformLocation(ssao_shader.program, "height");
+  }
+  
+  blur_shader.program = buildShaderProgram("blur_shader", blur_vs_source, blur_fs_source);
+  if(blur_shader.program) {
+    blur_shader.inputLuminanceTextureLocation = glGetUniformLocation(blur_shader.program, "luminanceSampler");
+		blur_shader.widthLocation = glGetUniformLocation(blur_shader.program, "width");
+    blur_shader.heightLocation = glGetUniformLocation(blur_shader.program, "height");		
+    blur_shader.dirLocation = glGetUniformLocation(blur_shader.program, "dir");
+  }
 }
 
 
 #endif // #ifdef ENABLE_GL_POSTPROCESS
+

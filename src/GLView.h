@@ -91,15 +91,25 @@ private:
 	bool canPostprocess();
 	
 	void paintGlWithPostprocess();
+	void drawFullscreenQuad();
 	void compilePostprocessShaders();
 	
 	struct {
 		GLint program;
 		GLint colorTextureLocation;
 		GLint depthTextureLocation;
+		GLint blurredDepthTextureLocation;
 		GLint heightLocation;
 		GLint widthLocation;
 	} ssao_shader;
+	
+	struct {
+		GLint program;
+		GLint inputLuminanceTextureLocation;
+		GLint heightLocation;
+		GLint widthLocation;
+		GLint dirLocation;
+	} blur_shader;
 
 #endif // #ifdef ENABLE_GL_POSTPROCESS
 	
